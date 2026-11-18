@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Database (ข้อมูลจริง — ไม่ push ขึ้น git)
+data/scores.db
+data/scores.db-wal
+data/scores.db-shm
+
+# Uploaded images (ไม่ push ขึ้น git)
+uploads/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor
+.vscode/
+.idea/
