@@ -395,6 +395,17 @@ body{
   border-radius:10px;color:#fff;outline:none;
   transition:border-color .15s,box-shadow .15s;
 }
+/* ── hide browser number spinner ── */
+.sub-row input.score::-webkit-inner-spin-button,
+.sub-row input.score::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.sub-row input.score{-moz-appearance:textfield;text-align:center}
+/* ── custom ±  buttons ── */
+.score-wrap{display:flex;align-items:center;gap:0;border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.10);width:108px;flex-shrink:0}
+.score-wrap input.score{width:100%;background:transparent;border:none;padding:10px 4px;text-align:center}
+.score-wrap input.score:focus{box-shadow:none;border:none}
+.score-step{flex-shrink:0;width:28px;height:38px;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.75);font-size:1rem;line-height:1;transition:background .15s,color .15s;user-select:none}
+.score-step:hover{background:rgba(255,255,255,0.18);color:#fff}
+.score-step:active{background:rgba(255,255,255,0.28)}
 .sub-row input::placeholder{color:var(--muted2)}
 .sub-row input:focus{border-color:rgba(255,255,255,0.55);box-shadow:0 0 0 4px rgba(255,255,255,0.12)}
 .rm-btn{
@@ -856,10 +867,19 @@ function openForm(id){
 function addSubRow(name='',score=''){
   const row=document.createElement('div');row.className='sub-row';
   const ni=document.createElement('input');ni.type='text';ni.className='name';ni.placeholder='ชื่อวิชา';ni.value=name;
-  const si=document.createElement('input');si.type='number';si.className='score';si.placeholder='คะแนน';si.min='0';si.step='0.01';si.value=score===''?'':score;
+
+  /* score wrap with ± buttons */
+  const wrap=document.createElement('div');wrap.className='score-wrap';
+  const minus=document.createElement('button');minus.type='button';minus.className='score-step';minus.setAttribute('aria-label','ลด');minus.textContent='−';
+  const si=document.createElement('input');si.type='number';si.className='score';si.placeholder='0';si.min='0';si.max='100';si.step='1';si.value=score===''?'':score;
+  const plus=document.createElement('button');plus.type='button';plus.className='score-step';plus.setAttribute('aria-label','เพิ่ม');plus.textContent='+';
+  minus.addEventListener('click',()=>{const v=parseFloat(si.value)||0;si.value=Math.max(0,v-1);});
+  plus.addEventListener('click',()=>{const v=parseFloat(si.value)||0;si.value=Math.min(100,v+1);});
+  wrap.appendChild(minus);wrap.appendChild(si);wrap.appendChild(plus);
+
   const rb=document.createElement('button');rb.type='button';rb.className='rm-btn';rb.setAttribute('aria-label','ลบ');rb.textContent='✕';
   rb.addEventListener('click',()=>row.remove());
-  row.appendChild(ni);row.appendChild(si);row.appendChild(rb);
+  row.appendChild(ni);row.appendChild(wrap);row.appendChild(rb);
   $('#subjectRows').appendChild(row);
 }
 
