@@ -3,15 +3,16 @@
   "version": "1.0.0",
   "description": "ระบบตรวจสอบคะแนนนักเรียน",
   "type": "module",
-  "main": "server.js",
+  "main": "api/index.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "vercel-build": "echo build done"
   },
   "engines": {
     "node": ">=22.5.0"
   },
   "dependencies": {
     "express": "4.22.3",
-    "pg": "^8.23.1"
+    "pg": "^8.13.3"
   }
 }
