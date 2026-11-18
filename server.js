@@ -3,71 +3,45 @@ import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 import { fileURLToPath } from 'url';
-import { DatabaseSync } from 'node:sqlite';
+import pg from 'pg';
 
+const { Pool } = pg;
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const app = express();
-const PORT = process.env.PORT || 3000;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
-const IS_PROD = process.env.NODE_ENV === 'production';
 
-// ── Directories ──────────────────────────────────────────────
-const DATA_DIR    = path.join(__dirname, 'data');
-const DB_PATH     = path.join(DATA_DIR, 'scores.db');
+const PORT           = process.env.PORT           || 3000;
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD  || 'admin123';
+const DATABASE_URL   = process.env.DATABASE_URL;
+const IS_PROD        = process.env.NODE_ENV === 'production';
+
+if (!DATABASE_URL) {
+  console.error('\n  ❌  DATABASE_URL is not set.');
+  console.error('  Set it in .env or as an environment variable.\n');
+  process.exit(1);
+}
+
+// ── PostgreSQL pool ───────────────────────────────────────────
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: IS_PROD ? { rejectUnauthorized: false } : false,
+  max: 10,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 5000,
+});
+
+pool.on('error', (err) => {
+  console.error('PostgreSQL pool error:', err.message);
+});
+
+// ── Directories ───────────────────────────────────────────────
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
 const PUBLIC_DIR  = path.join(__dirname, 'public');
 
-[DATA_DIR, UPLOADS_DIR].forEach((d) => {
-  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
-});
-
-// ── SQLite ────────────────────────────────────────────────────
-const db = new DatabaseSync(DB_PATH);
-db.exec('PRAGMA journal_mode = WAL');
-db.exec('PRAGMA foreign_keys = ON');
-
-db.exec(`
-CREATE TABLE IF NOT EXISTS students (
-  id       INTEGER PRIMARY KEY AUTOINCREMENT,
-  id_std   TEXT UNIQUE NOT NULL,
-  name     TEXT NOT NULL DEFAULT '',
-  picture  TEXT
-);
-CREATE TABLE IF NOT EXISTS subjects (
-  id         INTEGER PRIMARY KEY AUTOINCREMENT,
-  student_id INTEGER NOT NULL REFERENCES students(id) ON DELETE CASCADE,
-  name       TEXT NOT NULL,
-  score      REAL NOT NULL DEFAULT 0
-);
-`);
-
-// Seed sample data on first run
-if (db.prepare('SELECT COUNT(*) AS c FROM students').get().c === 0) {
-  const insS = db.prepare('INSERT INTO students (id_std, name, picture) VALUES (?, ?, ?)');
-  const insSub = db.prepare('INSERT INTO subjects (student_id, name, score) VALUES (?, ?, ?)');
-  db.exec('BEGIN');
-  try {
-    const seed = [
-      { id_std: '66010001', name: 'สมชาย ใจดี',      subs: [['คณิตศาสตร์',85],['ภาษาไทย',78],['ภาษาอังกฤษ',82]] },
-      { id_std: '66010002', name: 'สมหญิง รักเรียน',  subs: [['คณิตศาสตร์',92],['ภาษาไทย',88],['วิทยาศาสตร์',90]] },
-    ];
-    for (const s of seed) {
-      const { lastInsertRowid: sid } = insS.run(s.id_std, s.name, null);
-      for (const [n, sc] of s.subs) insSub.run(sid, n, sc);
-    }
-    db.exec('COMMIT');
-  } catch (e) { db.exec('ROLLBACK'); throw e; }
-}
-
-function tx(fn) {
-  db.exec('BEGIN');
-  try { const r = fn(); db.exec('COMMIT'); return r; }
-  catch (e) { db.exec('ROLLBACK'); throw e; }
-}
+if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 
 // ── Express config ────────────────────────────────────────────
-app.set('trust proxy', 1);                      // needed behind Render/Railway proxy
-app.disable('x-powered-by');                    // hide Express fingerprint
+const app = express();
+app.set('trust proxy', 1);
+app.disable('x-powered-by');
 
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -115,23 +89,38 @@ function cleanSubject(sub) {
   return { name, score: Number.isFinite(score) ? score : 0 };
 }
 
-function publicStudent(row) {
-  const subs = db.prepare('SELECT name, score FROM subjects WHERE student_id = ?').all(row.id);
+async function getStudentWithSubjects(client, id) {
+  const { rows: subs } = await client.query(
+    'SELECT name, score FROM subjects WHERE student_id = $1 ORDER BY id',
+    [id]
+  );
+  return subs.map(s => ({ name: s.name, score: parseFloat(s.score) }));
+}
+
+async function publicStudent(client, row) {
+  const subjects = await getStudentWithSubjects(client, row.id);
   return {
     id:       row.id,
     id_std:   row.id_std,
     name:     row.name,
     picture:  row.picture ? `/uploads/${row.picture}` : null,
-    subjects: subs.map(s => ({ name: s.name, score: s.score })),
+    subjects,
   };
 }
 
 // ── Routes ────────────────────────────────────────────────────
 
-// Public: health check (for Render/Railway zero-downtime deploy)
-app.get('/health', (_, res) => res.json({ status: 'ok' }));
+// Health check
+app.get('/health', async (req, res) => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', db: 'connected' });
+  } catch (e) {
+    res.status(503).json({ status: 'error', db: e.message });
+  }
+});
 
-// Public: login
+// Login
 app.post('/api/login', (req, res) => {
   const { password } = req.body || {};
   if (password === ADMIN_PASSWORD) {
@@ -143,102 +132,139 @@ app.post('/api/login', (req, res) => {
 });
 
 // Public: lookup student
-app.get('/api/student/:id_std', (req, res) => {
-  const row = db.prepare('SELECT * FROM students WHERE id_std = ?').get(req.params.id_std);
-  if (!row) return res.status(404).json({ error: 'ไม่พบรหัสนักเรียนนี้' });
-  res.json(publicStudent(row));
+app.get('/api/student/:id_std', async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query(
+      'SELECT * FROM students WHERE id_std = $1',
+      [req.params.id_std]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'ไม่พบรหัสนักเรียนนี้' });
+    res.json(await publicStudent(client, rows[0]));
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
 });
 
-// Admin: list
-app.get('/api/admin/students', auth, (req, res) => {
-  const rows = db.prepare('SELECT * FROM students ORDER BY id').all();
-  res.json(rows.map(publicStudent));
+// Admin: list all
+app.get('/api/admin/students', auth, async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query('SELECT * FROM students ORDER BY id');
+    const result = await Promise.all(rows.map(r => publicStudent(client, r)));
+    res.json(result);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
 });
 
 // Admin: create
-app.post('/api/admin/students', auth, (req, res) => {
+app.post('/api/admin/students', auth, async (req, res) => {
   const { id_std, name, picture, subjects } = req.body || {};
   if (!id_std || !String(id_std).trim())
     return res.status(400).json({ error: 'กรุณาระบุรหัสนักเรียน (ID STD)' });
-  if (db.prepare('SELECT 1 FROM students WHERE id_std = ?').get(id_std))
-    return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
 
   let pictureFile = null;
   if (picture && String(picture).startsWith('data:image'))
     pictureFile = savePicture(picture, id_std);
 
   const cleanSubs = (Array.isArray(subjects) ? subjects : []).map(cleanSubject).filter(Boolean);
-
-  let newId;
+  const client = await pool.connect();
   try {
-    newId = tx(() => {
-      const { lastInsertRowid: sid } = db
-        .prepare('INSERT INTO students (id_std, name, picture) VALUES (?, ?, ?)')
-        .run(id_std, name || '', pictureFile);
-      const insSub = db.prepare('INSERT INTO subjects (student_id, name, score) VALUES (?, ?, ?)');
-      for (const s of cleanSubs) insSub.run(sid, s.name, s.score);
-      return sid;
-    });
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      'INSERT INTO students (id_std, name, picture) VALUES ($1, $2, $3) RETURNING *',
+      [id_std, name || '', pictureFile]
+    );
+    const sid = rows[0].id;
+    for (const s of cleanSubs) {
+      await client.query(
+        'INSERT INTO subjects (student_id, name, score) VALUES ($1, $2, $3)',
+        [sid, s.name, s.score]
+      );
+    }
+    await client.query('COMMIT');
+    res.status(201).json(await publicStudent(client, rows[0]));
   } catch (e) {
+    await client.query('ROLLBACK');
     deletePicture(pictureFile);
-    if (String(e.message).includes('UNIQUE'))
-      return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
-    return res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+    if (e.code === '23505') return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
+    res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+  } finally {
+    client.release();
   }
-
-  res.status(201).json(publicStudent(db.prepare('SELECT * FROM students WHERE id = ?').get(newId)));
 });
 
 // Admin: update
-app.put('/api/admin/students/:id', auth, (req, res) => {
-  const id  = parseInt(req.params.id, 10);
-  const row = db.prepare('SELECT * FROM students WHERE id = ?').get(id);
-  if (!row) return res.status(404).json({ error: 'ไม่พบนักเรียน' });
-
+app.put('/api/admin/students/:id', auth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
   const { id_std, name, picture, subjects, clearPicture } = req.body || {};
-
-  if (id_std && id_std !== row.id_std) {
-    if (db.prepare('SELECT 1 FROM students WHERE id_std = ? AND id != ?').get(id_std, id))
-      return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
-  }
-
-  let newPic = row.picture;
-  if (clearPicture) { deletePicture(row.picture); newPic = null; }
-  else if (picture && String(picture).startsWith('data:image')) {
-    deletePicture(row.picture);
-    newPic = savePicture(picture, id_std || row.id_std);
-  }
-
+  const client = await pool.connect();
   try {
-    tx(() => {
-      db.prepare('UPDATE students SET id_std = ?, name = ?, picture = ? WHERE id = ?')
-        .run(id_std || row.id_std, name !== undefined ? name : row.name, newPic, id);
-      if (subjects !== undefined) {
-        db.prepare('DELETE FROM subjects WHERE student_id = ?').run(id);
-        const insSub = db.prepare('INSERT INTO subjects (student_id, name, score) VALUES (?, ?, ?)');
-        for (const s of (Array.isArray(subjects) ? subjects : []).map(cleanSubject).filter(Boolean))
-          insSub.run(id, s.name, s.score);
-      }
-    });
-  } catch (e) {
-    if (newPic !== row.picture) deletePicture(newPic);
-    return res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
-  }
+    const { rows } = await client.query('SELECT * FROM students WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'ไม่พบนักเรียน' });
+    const row = rows[0];
 
-  res.json(publicStudent(db.prepare('SELECT * FROM students WHERE id = ?').get(id)));
+    if (id_std && id_std !== row.id_std) {
+      const dup = await client.query(
+        'SELECT 1 FROM students WHERE id_std = $1 AND id != $2', [id_std, id]
+      );
+      if (dup.rows.length) return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
+    }
+
+    let newPic = row.picture;
+    if (clearPicture) { deletePicture(row.picture); newPic = null; }
+    else if (picture && String(picture).startsWith('data:image')) {
+      deletePicture(row.picture);
+      newPic = savePicture(picture, id_std || row.id_std);
+    }
+
+    await client.query('BEGIN');
+    const updated = await client.query(
+      'UPDATE students SET id_std=$1, name=$2, picture=$3 WHERE id=$4 RETURNING *',
+      [id_std || row.id_std, name !== undefined ? name : row.name, newPic, id]
+    );
+    if (subjects !== undefined) {
+      await client.query('DELETE FROM subjects WHERE student_id = $1', [id]);
+      for (const s of (Array.isArray(subjects) ? subjects : []).map(cleanSubject).filter(Boolean)) {
+        await client.query(
+          'INSERT INTO subjects (student_id, name, score) VALUES ($1, $2, $3)',
+          [id, s.name, s.score]
+        );
+      }
+    }
+    await client.query('COMMIT');
+    res.json(await publicStudent(client, updated.rows[0]));
+  } catch (e) {
+    await client.query('ROLLBACK').catch(() => {});
+    res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+  } finally {
+    client.release();
+  }
 });
 
 // Admin: delete
-app.delete('/api/admin/students/:id', auth, (req, res) => {
-  const id  = parseInt(req.params.id, 10);
-  const row = db.prepare('SELECT picture FROM students WHERE id = ?').get(id);
-  if (!row) return res.status(404).json({ error: 'ไม่พบนักเรียน' });
-  db.prepare('DELETE FROM students WHERE id = ?').run(id);
-  deletePicture(row.picture);
-  res.json({ success: true });
+app.delete('/api/admin/students/:id', auth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const client = await pool.connect();
+  try {
+    const { rows } = await client.query('SELECT picture FROM students WHERE id = $1', [id]);
+    if (!rows.length) return res.status(404).json({ error: 'ไม่พบนักเรียน' });
+    await client.query('DELETE FROM students WHERE id = $1', [id]);
+    deletePicture(rows[0].picture);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    client.release();
+  }
 });
 
-// ── Global error handler ──────────────────────────────────────
+// Global error handler
 app.use((err, req, res, _next) => {
   console.error(err);
   res.status(500).json({ error: 'Internal server error' });
@@ -247,6 +273,6 @@ app.use((err, req, res, _next) => {
 // ── Start ─────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`\n  📊 ระบบตรวจสอบคะแนน พร้อมที่ http://localhost:${PORT}`);
-  console.log(`  💾 SQLite: ${DB_PATH}`);
+  console.log(`  🐘 PostgreSQL: connected via DATABASE_URL`);
   console.log(`  🔒 Admin password: ${IS_PROD ? '(set via ADMIN_PASSWORD env)' : ADMIN_PASSWORD}\n`);
 });
