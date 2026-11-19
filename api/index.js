@@ -61,14 +61,48 @@ app.use('/uploads', (req, res) => {
 });
 
 // ── Auth ──────────────────────────────────────────────────────
-const tokens = new Set();
+const AUTH_SECRET = process.env.ADMIN_PASSWORD || 'std-score-admin-secret-2026';
 
-function auth(req, res, next) {
+function generateToken() {
+  const timestamp = Date.now();
+  const signature = crypto.createHmac('sha256', AUTH_SECRET).update(`admin:${timestamp}`).digest('hex');
+  return `${timestamp}.${signature}`;
+}
+
+function verifyToken(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  if (parts.length !== 2) return false;
+  const [timestamp, signature] = parts;
+  const time = parseInt(timestamp, 10);
+  if (isNaN(time)) return false;
+  if (Date.now() - time > 7 * 24 * 60 * 60 * 1000) return false;
+  try {
+    const expected = crypto.createHmac('sha256', AUTH_SECRET).update(`admin:${timestamp}`).digest('hex');
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected));
+  } catch (_) {
+    return false;
+  }
+}
+
+async function auth(req, res, next) {
   const header = req.headers.authorization || '';
-  const token  = header.replace('Bearer ', '');
-  if (!token || !tokens.has(token))
-    return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
-  next();
+  const token  = header.replace(/^Bearer\s+/i, '').trim();
+  if (!token) return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
+
+  if (verifyToken(token)) return next();
+
+  if (pool) {
+    try {
+      const { rows } = await pool.query(
+        'SELECT 1 FROM admin_sessions WHERE token = $1 AND expires_at > NOW()',
+        [token]
+      );
+      if (rows.length > 0) return next();
+    } catch (_) {}
+  }
+
+  return res.status(401).json({ error: 'กรุณาเข้าสู่ระบบ' });
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -125,13 +159,37 @@ app.get('/health', async (req, res) => {
   }
 });
 
-app.post('/api/login', (req, res) => {
-  const { password } = req.body || {};
+app.post('/api/login', async (req, res) => {
+  const { password, username } = req.body || {};
+  let isValid = false;
+
   if (password === ADMIN_PASSWORD) {
-    const token = crypto.randomBytes(24).toString('hex');
-    tokens.add(token);
+    isValid = true;
+  }
+
+  if (!isValid && pool) {
+    try {
+      const { rows } = await pool.query(
+        'SELECT 1 FROM admins WHERE (username = $1 OR username = \'admin\') AND password = $2',
+        [username || 'admin', password]
+      );
+      if (rows.length > 0) isValid = true;
+    } catch (e) {
+      console.error('DB Admin check error:', e.message);
+    }
+  }
+
+  if (isValid) {
+    const token = generateToken();
+    if (pool) {
+      pool.query(
+        'INSERT INTO admin_sessions (token) VALUES ($1) ON CONFLICT (token) DO NOTHING',
+        [token]
+      ).catch(() => {});
+    }
     return res.json({ token });
   }
+
   res.status(401).json({ error: 'รหัสผ่านไม่ถูกต้อง' });
 });
 
