@@ -583,76 +583,22 @@ body{
 </div>
 
 <script>
-/* ── mock data (standalone preview) ── */
-const MOCK = {
-  students:[
-    {id:1,id_std:'66010001',name:'สมชาย ใจดี',    picture:null,subjects:[{name:'คณิตศาสตร์',score:85},{name:'ภาษาไทย',score:78},{name:'ภาษาอังกฤษ',score:82}]},
-    {id:2,id_std:'66010002',name:'สมหญิง รักเรียน',picture:null,subjects:[{name:'คณิตศาสตร์',score:92},{name:'ภาษาไทย',score:88},{name:'วิทยาศาสตร์',score:90}]}
-  ],
-  nextId:3
+/* ── state ── */
+const state = {
+  token: localStorage.getItem('admin_token') || '',
+  editingId: null,
+  pendingPic: null,
+  keepPic: false
 };
-const ADMIN_PW='admin123';
 
-function pubStu(s){return{id:s.id,id_std:s.id_std,name:s.name,picture:s.picture,subjects:(s.subjects||[])};}
-function cleanSubs(arr){
-  if(!Array.isArray(arr))return[];
-  return arr.map(x=>{
-    const n=String((x&&x.name)||'').trim();
-    if(!n)return null;
-    const sc=Number(x.score);
-    return{name:n,score:Number.isFinite(sc)?sc:0};
-  }).filter(Boolean);
-}
-async function api(path,opts={}){
-  await new Promise(r=>setTimeout(r,180));
-  const method=(opts.method||'GET').toUpperCase();
-  const body=opts.body?JSON.parse(opts.body):null;
-  /* login */
-  if(path==='/api/login'&&method==='POST'){
-    if(body&&body.password===ADMIN_PW)return{token:'demo'};
-    throw Object.assign(new Error('รหัสผ่านไม่ถูกต้อง'),{status:401});
-  }
-  /* public lookup */
-  let m=path.match(/^\/api\/student\/(.+)$/);
-  if(m&&method==='GET'){
-    const s=MOCK.students.find(x=>x.id_std===decodeURIComponent(m[1]));
-    if(!s)throw Object.assign(new Error('ไม่พบรหัสนักเรียนนี้'),{status:404});
-    return pubStu(s);
-  }
-  /* admin list */
-  if(path==='/api/admin/students'&&method==='GET')return MOCK.students.map(pubStu);
-  /* admin create */
-  if(path==='/api/admin/students'&&method==='POST'){
-    if(!body||!String(body.id_std||'').trim())throw Object.assign(new Error('กรุณาระบุรหัสนักเรียน'),{status:400});
-    if(MOCK.students.some(x=>x.id_std===body.id_std))throw Object.assign(new Error('รหัสนักเรียนซ้ำในระบบ'),{status:409});
-    const s={id:MOCK.nextId++,id_std:body.id_std,name:body.name||'',
-              picture:(body.picture&&String(body.picture).startsWith('data:image'))?body.picture:null,
-              subjects:cleanSubs(body.subjects)};
-    MOCK.students.push(s);return pubStu(s);
-  }
-  /* admin update */
-  m=path.match(/^\/api\/admin\/students\/(\d+)$/);
-  if(m&&method==='PUT'){
-    const id=parseInt(m[1]);const s=MOCK.students.find(x=>x.id===id);
-    if(!s)throw Object.assign(new Error('ไม่พบนักเรียน'),{status:404});
-    if(body.id_std&&body.id_std!==s.id_std){
-      if(MOCK.students.some(x=>x.id!==id&&x.id_std===body.id_std))
-        throw Object.assign(new Error('รหัสนักเรียนซ้ำในระบบ'),{status:409});
-      s.id_std=body.id_std;
-    }
-    if(body.name!==undefined)s.name=body.name;
-    if(body.subjects!==undefined)s.subjects=cleanSubs(body.subjects);
-    if(body.clearPicture)s.picture=null;
-    else if(body.picture&&String(body.picture).startsWith('data:image'))s.picture=body.picture;
-    return pubStu(s);
-  }
-  /* admin delete */
-  if(m&&method==='DELETE'){
-    const id=parseInt(m[1]);const i=MOCK.students.findIndex(x=>x.id===id);
-    if(i<0)throw Object.assign(new Error('ไม่พบนักเรียน'),{status:404});
-    MOCK.students.splice(i,1);return{success:true};
-  }
-  throw Object.assign(new Error('not found'),{status:404});
+/* ── api ── */
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+  const res = await fetch(path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+  return data;
 }
 
 /* ── helpers ── */
@@ -723,8 +669,6 @@ function renderResult(s){
   $('#resultBox').classList.remove('hidden');
 }
 
-/* ── state ── */
-const state={token:localStorage.getItem('admin_token')||'',editingId:null,pendingPic:null,keepPic:false};
 
 /* ── login ── */
 $('#loginForm').addEventListener('submit',async e=>{

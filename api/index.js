@@ -25,6 +25,12 @@ const pool = DATABASE_URL ? new Pool({
   connectionTimeoutMillis: 5000,
 }) : null;
 
+if (pool) {
+  pool.on('error', (err) => {
+    console.error('PostgreSQL pool error:', err.message);
+  });
+}
+
 // ── Uploads dir (Vercel /tmp is writable) ─────────────────────
 const UPLOADS_DIR = '/tmp/uploads';
 if (!fs.existsSync(UPLOADS_DIR)) fs.mkdirSync(UPLOADS_DIR, { recursive: true });

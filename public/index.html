@@ -1,20 +1,440 @@
 <!DOCTYPE html>
 <html lang="th">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
-  <meta name="theme-color" content="#ffffff" />
-  <title>ระบบตรวจสอบคะแนน</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/css/style.css" />
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=5.0"/>
+<title>ระบบตรวจสอบคะแนน</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<style>
+/* ── reset ── */
+*{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%}
+
+/* ── tokens ── */
+:root{
+  --f:'Noto Sans Thai','Segoe UI',sans-serif;
+  --bg1:#1a0533; --bg2:#2d0a6e; --bg3:#0d1b6e; --bg4:#47036b;
+  --g0:rgba(255,255,255,0.18);
+  --g1:rgba(255,255,255,0.11);
+  --g2:rgba(255,255,255,0.07);
+  --border:rgba(255,255,255,0.28);
+  --border2:rgba(255,255,255,0.15);
+  --blur:blur(22px) saturate(160%);
+  --txt:#fff;
+  --muted:rgba(255,255,255,0.68);
+  --muted2:rgba(255,255,255,0.45);
+  --accent:#c084fc;
+  --pill:999px;
+  --r:22px; --rs:14px;
+  --sh:0 8px 36px rgba(0,0,0,0.30);
+  --sh2:0 2px 12px rgba(0,0,0,0.20);
+}
+
+/* ── background ── */
+body{
+  font-family:var(--f);
+  color:var(--txt);
+  min-height:100vh;
+  line-height:1.6;
+  -webkit-tap-highlight-color:transparent;
+  overflow-x:hidden;
+  background:
+    radial-gradient(ellipse 80% 60% at 15% 10%, #6d28d9 0%, transparent 55%),
+    radial-gradient(ellipse 70% 55% at 85% 8%,  #9333ea 0%, transparent 50%),
+    radial-gradient(ellipse 80% 60% at 80% 92%, #db2777 0%, transparent 55%),
+    radial-gradient(ellipse 70% 55% at 10% 90%, #2563eb 0%, transparent 50%),
+    #160828;
+  background-attachment:fixed;
+}
+
+/* ── glass helpers ── */
+.glass{
+  background:var(--g0);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  box-shadow:var(--sh);
+}
+.glass2{
+  background:var(--g1);
+  backdrop-filter:var(--blur);
+  -webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border2);
+  border-radius:var(--rs);
+  box-shadow:var(--sh2);
+}
+
+/* ── icons ── */
+.ico{width:20px;height:20px;display:block;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}
+
+/* ── navbar ── */
+.topbar{
+  position:sticky;top:14px;z-index:60;
+  max-width:720px;margin:14px auto 0;padding:0 14px;
+}
+.nav{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:9px 12px;border-radius:var(--pill);
+  background:rgba(255,255,255,0.13);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border);box-shadow:var(--sh);
+}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{
+  width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#8b5cf6,#ec4899);
+  box-shadow:0 4px 16px rgba(168,85,247,0.55);
+}
+.brand-mark .ico{width:19px;height:19px;stroke:#fff}
+.brand-text{font-size:1rem;font-weight:700}
+.tabs{
+  display:flex;gap:2px;
+  background:rgba(255,255,255,0.10);
+  padding:3px;border-radius:var(--pill);
+  border:1px solid var(--border2);
+}
+.tab{
+  background:transparent;border:none;color:var(--muted);
+  font-family:var(--f);font-size:0.9rem;font-weight:600;
+  padding:7px 18px;border-radius:var(--pill);cursor:pointer;
+  transition:all .2s ease;
+}
+.tab.active{
+  background:#fff;color:#5b21b6;
+  box-shadow:0 3px 10px rgba(0,0,0,0.25);
+}
+
+/* ── layout ── */
+#app{
+  position:relative;z-index:1;
+  max-width:620px;margin:0 auto;
+  padding:20px 14px 60px;
+}
+.view{display:none}
+.view.active{display:block;animation:viewIn .4s cubic-bezier(.22,1,.36,1) both}
+@keyframes viewIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+.card{padding:24px 22px;margin-bottom:16px}
+
+/* ── buttons ── */
+.btn{
+  font-family:var(--f);font-weight:600;font-size:0.95rem;
+  border:none;border-radius:var(--pill);
+  padding:12px 22px;cursor:pointer;color:#fff;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+  white-space:nowrap;transition:transform .1s,filter .18s,box-shadow .18s;
+}
+.btn:active{transform:scale(0.96)}
+.btn-primary{
+  background:linear-gradient(135deg,#8b5cf6 0%,#ec4899 100%);
+  box-shadow:0 8px 24px rgba(139,92,246,0.5),inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.btn-primary:hover{filter:brightness(1.08)}
+.btn-primary:disabled{opacity:.65;cursor:default}
+.btn-glass{
+  background:rgba(255,255,255,0.14);
+  border:1px solid var(--border2);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.btn-glass:hover{background:rgba(255,255,255,0.22)}
+.btn-danger{background:rgba(244,114,182,0.18);border:1px solid rgba(244,114,182,0.4);color:#fda4af}
+.btn-danger:hover{background:rgba(244,114,182,0.30)}
+.btn-sm{padding:7px 14px;font-size:0.84rem}
+.btn-block{width:100%}
+
+/* ── input ── */
+.input-wrap{position:relative;flex:1;display:flex;align-items:center}
+.input-icon{position:absolute;left:15px;width:18px;height:18px;stroke:var(--muted2);pointer-events:none}
+.input-wrap input{
+  width:100%;
+  padding:13px 16px 13px 44px;
+  font-family:var(--f);font-size:1rem;
+  background:rgba(255,255,255,0.12);
+  border:1px solid var(--border2);
+  border-radius:var(--pill);
+  color:#fff;outline:none;
+  box-shadow:inset 0 1px 4px rgba(0,0,0,0.15);
+  transition:border-color .18s,box-shadow .18s;
+}
+.input-wrap input::placeholder{color:var(--muted2)}
+.input-wrap input:focus{
+  border-color:rgba(255,255,255,0.55);
+  box-shadow:0 0 0 4px rgba(255,255,255,0.12),inset 0 1px 4px rgba(0,0,0,0.15);
+}
+
+/* ── messages ── */
+.msg{min-height:1.2em;margin-top:12px;font-size:0.88rem}
+.msg.error{color:#fca5a5}
+.msg.success{color:#86efac}
+.hidden{display:none!important}
+.muted{color:var(--muted);font-size:0.88rem}
+
+/* ── spinner ── */
+.spinner{
+  width:16px;height:16px;
+  border:2px solid rgba(255,255,255,0.35);
+  border-top-color:#fff;
+  border-radius:50%;
+  animation:spin .6s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ══════════════════════════════
+   USER — lookup
+══════════════════════════════ */
+.lookup-card{text-align:center;padding:32px 24px 26px}
+.lc-icon{
+  width:72px;height:72px;margin:0 auto 18px;
+  border-radius:22px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#8b5cf6,#ec4899);
+  box-shadow:0 12px 32px rgba(139,92,246,0.5),inset 0 1px 0 rgba(255,255,255,0.35);
+}
+.lc-icon .ico{width:34px;height:34px;stroke:#fff;stroke-width:1.8}
+.lookup-card h1{font-size:1.65rem;font-weight:800;margin-bottom:7px}
+.lookup-card .muted{margin-bottom:22px}
+.lookup-form{display:flex;gap:10px;align-items:stretch}
+.lookup-msg-wrap{margin-top:4px}
+.tags{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.tag{
+  font-family:var(--f);font-size:0.8rem;cursor:pointer;
+  color:var(--muted);
+  background:rgba(255,255,255,0.10);
+  border:1px solid var(--border2);
+  padding:6px 15px;border-radius:var(--pill);
+  transition:all .18s;
+}
+.tag:hover{background:rgba(255,255,255,0.20);color:#fff}
+
+/* ══════════════════════════════
+   USER — result card
+══════════════════════════════ */
+.result-box{animation:resultIn .5s cubic-bezier(.22,1,.36,1) both}
+@keyframes resultIn{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.student-card{padding:22px}
+
+/* header row */
+.sc-header{display:flex;align-items:center;gap:14px}
+.avatar{
+  width:62px;height:62px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  border:2.5px solid rgba(255,255,255,0.5);
+  box-shadow:0 6px 20px rgba(0,0,0,0.30);
+  background:rgba(255,255,255,0.12);
+}
+.avatar img{width:100%;height:100%;object-fit:cover;display:block}
+.avatar-fallback{
+  width:100%;height:100%;
+  display:grid;place-items:center;
+  background:linear-gradient(135deg,#8b5cf6,#ec4899);
+  font-size:1.6rem;font-weight:800;color:#fff;
+}
+.sc-meta{}
+.sc-name{font-size:1.3rem;font-weight:800;line-height:1.2}
+.sc-id-badge{
+  display:inline-block;margin-top:5px;
+  font-size:0.76rem;font-weight:600;
+  color:var(--muted);
+  background:rgba(255,255,255,0.12);
+  border:1px solid var(--border2);
+  padding:3px 12px;border-radius:var(--pill);
+}
+
+/* subject count pill */
+.sc-count{
+  display:inline-flex;align-items:center;gap:6px;
+  margin:16px 0 14px;
+  font-size:0.8rem;font-weight:600;color:var(--muted);
+  background:rgba(255,255,255,0.09);
+  border:1px solid var(--border2);
+  padding:5px 14px;border-radius:var(--pill);
+}
+
+/* score rows — stagger via JS delay */
+.score-list{display:flex;flex-direction:column;gap:8px}
+.score-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:13px 16px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid var(--border2);
+  border-radius:var(--rs);
+  gap:12px;
+  opacity:0;transform:translateY(10px);
+  transition:opacity .35s ease,transform .35s cubic-bezier(.22,1,.36,1);
+}
+.score-row.visible{opacity:1;transform:none}
+.sr-name{
+  font-size:0.97rem;font-weight:500;
+  flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+}
+.sr-score{
+  font-size:1rem;font-weight:700;
+  color:#e9d5ff;
+  background:rgba(167,139,250,0.20);
+  border:1px solid rgba(167,139,250,0.35);
+  padding:4px 14px;border-radius:var(--pill);
+  white-space:nowrap;flex-shrink:0;min-width:52px;text-align:center;
+}
+.score-empty{text-align:center;color:var(--muted2);padding:22px 0;font-size:0.92rem}
+
+/* ══════════════════════════════
+   ADMIN — login
+══════════════════════════════ */
+.login-card{max-width:400px;margin:28px auto 0;text-align:center;padding:28px 22px}
+.login-card h2{font-size:1.3rem;font-weight:800;margin-bottom:6px}
+.login-form{display:flex;gap:10px;align-items:stretch;text-align:left;margin-top:18px}
+.hint-sm{font-size:0.8rem;color:var(--muted2);margin-top:14px}
+.hint-sm code{background:rgba(255,255,255,0.15);padding:2px 8px;border-radius:6px;font-family:monospace}
+
+/* ══════════════════════════════
+   ADMIN — panel
+══════════════════════════════ */
+.admin-top{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.admin-top h2{font-size:1.25rem;font-weight:800}
+.count-pill{
+  display:inline-flex;align-items:center;gap:5px;margin-top:4px;
+  font-size:0.78rem;font-weight:600;color:var(--muted);
+  background:rgba(255,255,255,0.10);border:1px solid var(--border2);
+  padding:3px 12px;border-radius:var(--pill);
+}
+.student-list{display:grid;gap:10px;margin-top:14px}
+.student-item{
+  display:flex;align-items:center;gap:12px;padding:13px 14px;
+  background:rgba(255,255,255,0.10);
+  backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
+  border:1px solid var(--border2);border-radius:var(--rs);
+  box-shadow:var(--sh2);transition:transform .15s,border-color .18s;
+}
+.student-item:hover{transform:translateY(-2px);border-color:var(--border)}
+.si-av{
+  width:46px;height:46px;border-radius:50%;flex-shrink:0;overflow:hidden;
+  border:2px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.10);
+}
+.si-av img{width:100%;height:100%;object-fit:cover;display:block}
+.si-av .avatar-fallback{font-size:1.1rem}
+.si-info{flex:1;min-width:0}
+.si-id{font-size:0.73rem;font-weight:600;color:var(--muted2)}
+.si-name{font-size:0.98rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.si-subs{font-size:0.77rem;color:var(--muted2);margin-top:2px}
+.si-actions{display:flex;gap:6px;flex-shrink:0}
+.list-empty{text-align:center;color:var(--muted2);padding:28px;font-size:0.9rem}
+
+/* ══════════════════════════════
+   MODAL
+══════════════════════════════ */
+.modal{
+  position:fixed;inset:0;z-index:100;
+  display:flex;align-items:center;justify-content:center;padding:16px;
+  pointer-events:none;
+}
+.modal.open{pointer-events:all}
+
+.modal-backdrop{
+  position:absolute;inset:0;
+  background:rgba(10,5,25,0.55);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;transition:opacity .35s ease;
+}
+.modal.open .modal-backdrop{opacity:1}
+
+.modal-box{
+  position:relative;width:100%;max-width:450px;max-height:92vh;overflow-y:auto;
+  padding:22px;border-radius:var(--r);
+  background:rgba(255,255,255,0.16);
+  backdrop-filter:blur(28px) saturate(160%);-webkit-backdrop-filter:blur(28px) saturate(160%);
+  border:1px solid var(--border);box-shadow:var(--sh);
+  opacity:0;transform:translateY(28px) scale(.97);
+  transition:opacity .4s cubic-bezier(.22,1,.36,1),transform .4s cubic-bezier(.22,1,.36,1);
+}
+.modal.open .modal-box{opacity:1;transform:none}
+.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-head h3{font-size:1.1rem;font-weight:700}
+.icon-btn{
+  width:34px;height:34px;border-radius:10px;display:grid;place-items:center;cursor:pointer;
+  background:rgba(255,255,255,0.12);border:1px solid var(--border2);color:var(--muted);
+  transition:background .15s;
+}
+.icon-btn:hover{background:rgba(255,255,255,0.22);color:#fff}
+.icon-btn .ico{width:16px;height:16px}
+
+.sform{display:flex;flex-direction:column;gap:14px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-family:var(--f);font-size:0.84rem;font-weight:600;color:rgba(255,255,255,0.80)}
+.field em{color:#fca5a5;font-style:normal}
+.field input[type=text],.field input[type=number]{
+  font-family:var(--f);font-size:0.97rem;padding:11px 14px;
+  background:rgba(255,255,255,0.11);border:1px solid var(--border2);
+  border-radius:var(--rs);color:#fff;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+.field input::placeholder{color:var(--muted2)}
+.field input:focus{border-color:rgba(255,255,255,0.55);box-shadow:0 0 0 4px rgba(255,255,255,0.12)}
+
+.dropzone{
+  display:block;cursor:pointer;text-align:center;
+  border:1.5px dashed rgba(255,255,255,0.30);
+  border-radius:var(--rs);padding:20px;
+  background:rgba(255,255,255,0.05);transition:all .18s;
+}
+.dropzone:hover{border-color:rgba(255,255,255,0.55);background:rgba(255,255,255,0.10)}
+.dropzone input[type=file]{display:none}
+.dz-label{display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--muted);font-size:0.88rem}
+.dz-label .ico{width:28px;height:28px;stroke:var(--muted2)}
+.pic-preview{max-width:180px;width:100%;height:160px;object-fit:cover;border-radius:var(--rs);margin:0 auto;display:block;border:1px solid var(--border)}
+
+.subs-block{border-top:1px solid var(--border2);padding-top:14px}
+.subs-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.subs-head span{font-size:0.86rem;font-weight:600}
+.sub-row{display:flex;gap:7px;align-items:center;margin-bottom:8px}
+.sub-row input.name{flex:1}
+.sub-row input.score{width:88px}
+.sub-row input{
+  font-family:var(--f);font-size:0.92rem;padding:10px 12px;
+  background:rgba(255,255,255,0.10);border:1px solid var(--border2);
+  border-radius:10px;color:#fff;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+/* ── hide browser number spinner ── */
+.sub-row input.score::-webkit-inner-spin-button,
+.sub-row input.score::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.sub-row input.score{-moz-appearance:textfield;text-align:center}
+/* ── custom ±  buttons ── */
+.score-wrap{display:flex;align-items:center;gap:0;border:1px solid var(--border2);border-radius:10px;overflow:hidden;background:rgba(255,255,255,0.10);width:108px;flex-shrink:0}
+.score-wrap input.score{width:100%;background:transparent;border:none;padding:10px 4px;text-align:center}
+.score-wrap input.score:focus{box-shadow:none;border:none}
+.score-step{flex-shrink:0;width:28px;height:38px;display:grid;place-items:center;cursor:pointer;background:rgba(255,255,255,0.08);border:none;color:rgba(255,255,255,0.75);font-size:1rem;line-height:1;transition:background .15s,color .15s;user-select:none}
+.score-step:hover{background:rgba(255,255,255,0.18);color:#fff}
+.score-step:active{background:rgba(255,255,255,0.28)}
+.sub-row input::placeholder{color:var(--muted2)}
+.sub-row input:focus{border-color:rgba(255,255,255,0.55);box-shadow:0 0 0 4px rgba(255,255,255,0.12)}
+.rm-btn{
+  width:36px;height:38px;border-radius:9px;display:grid;place-items:center;cursor:pointer;flex-shrink:0;
+  background:rgba(248,113,113,0.15);border:1px solid rgba(248,113,113,0.35);color:#fca5a5;
+  font-size:0.9rem;transition:background .15s;
+}
+.rm-btn:hover{background:rgba(248,113,113,0.28)}
+
+.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.form-actions .btn{min-width:110px}
+
+/* ── responsive ── */
+@media(max-width:460px){
+  .lookup-form,.login-form{flex-direction:column}
+  .form-actions .btn{flex:1}
+  .student-item{flex-wrap:wrap}
+  .si-actions{width:100%;justify-content:flex-end}
+}
+</style>
 </head>
 <body>
-  <header class="topbar">
+
+<!-- ── Navbar ── -->
+<header class="topbar">
+  <div class="nav">
     <div class="brand">
       <span class="brand-mark">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1 2.5 3 6 3s6-2 6-3v-5"/></svg>
+        <svg class="ico" viewBox="0 0 24 24"><path d="M22 10 12 5 2 10l10 5 10-5Z"/><path d="M6 12v5c0 1.1 2.7 3 6 3s6-1.9 6-3v-5"/></svg>
       </span>
       <span class="brand-text">ระบบตรวจสอบคะแนน</span>
     </div>
@@ -22,125 +442,409 @@
       <button class="tab active" data-view="user">ผู้ใช้</button>
       <button class="tab" data-view="admin">Admin</button>
     </nav>
-  </header>
+  </div>
+</header>
 
-  <main id="app">
-    <!-- ============ USER VIEW ============ -->
-    <section id="view-user" class="view active">
-      <div class="card lookup-card">
-        <h1>ตรวจสอบคะแนน</h1>
-        <p class="hint">กรอกรหัสนักเรียน (ID STD) เพื่อดูคะแนนรายวิชา</p>
-        <form id="lookupForm" class="lookup-form">
-          <div class="input-wrap">
-            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-            <input type="text" id="lookupId" placeholder="เช่น 66010001" autocomplete="off" inputmode="numeric" required />
-          </div>
-          <button type="submit" class="btn btn-primary" id="lookupBtn">ตรวจสอบ</button>
-        </form>
-        <div id="lookupMsg" class="msg"></div>
+<main id="app">
+
+  <!-- ══════ USER ══════ -->
+  <section id="view-user" class="view active">
+
+    <div class="glass card lookup-card">
+      <div class="lc-icon">
+        <svg class="ico" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
       </div>
-
-      <div id="resultBox" class="result-box hidden">
-        <div class="card student-card">
-          <div class="student-head">
-            <div class="avatar" id="studentAvatar"></div>
-            <div class="student-meta">
-              <div class="student-name" id="studentName"></div>
-              <div class="student-id" id="studentId"></div>
-            </div>
-          </div>
-          <div class="meta-line" id="statsRow"></div>
-          <table class="score-table">
-            <thead>
-              <tr><th>วิชา</th><th class="col-score">คะแนน</th></tr>
-            </thead>
-            <tbody id="scoreBody"></tbody>
-          </table>
+      <h1>ตรวจสอบคะแนน</h1>
+      <p class="muted">กรอกรหัสนักเรียน (ID STD) เพื่อดูคะแนนรายวิชา</p>
+      <form id="lookupForm" class="lookup-form" style="margin-top:20px">
+        <div class="input-wrap">
+          <svg class="ico input-icon" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.35-4.35"/></svg>
+          <input type="text" id="lookupId" placeholder="เช่น 66010001" autocomplete="off" inputmode="numeric" required/>
         </div>
+        <button type="submit" class="btn btn-primary" id="lookupBtn">ตรวจสอบ</button>
+      </form>
+      <div id="lookupMsg" class="msg"></div>
+      <div class="tags">
+        <span class="tag" data-id="66010001">ลอง 66010001</span>
+        <span class="tag" data-id="66010002">ลอง 66010002</span>
       </div>
-    </section>
+    </div>
 
-    <!-- ============ ADMIN VIEW ============ -->
-    <section id="view-admin" class="view">
-      <div id="adminLogin" class="card login-card">
-        <h2>เข้าสู่ระบบ Admin</h2>
-        <p class="hint">กรุณาใส่รหัสผ่านเพื่อจัดการข้อมูลนักเรียน</p>
-        <form id="loginForm" class="login-form">
-          <div class="input-wrap">
-            <svg class="input-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <input type="password" id="adminPassword" placeholder="รหัสผ่าน" required />
-          </div>
-          <button type="submit" class="btn btn-primary">เข้าสู่ระบบ</button>
-        </form>
-        <div id="loginMsg" class="msg"></div>
-        <p class="hint small">รหัสผ่านเริ่มต้น: <code>admin123</code></p>
-      </div>
+    <div id="resultBox" class="result-box hidden">
+      <div class="glass2 student-card">
 
-      <div id="adminPanel" class="hidden">
-        <div class="admin-header">
-          <div class="admin-title">
-            <h2>จัดการข้อมูลนักเรียน</h2>
-            <p class="hint" id="adminCount"></p>
+        <!-- ชื่อ + รูป -->
+        <div class="sc-header">
+          <div class="avatar" id="studentAvatar"></div>
+          <div class="sc-meta">
+            <div class="sc-name" id="studentName"></div>
+            <div class="sc-id-badge" id="studentId"></div>
           </div>
-          <button id="logoutBtn" class="btn btn-ghost btn-sm">ออกจากระบบ</button>
         </div>
-        <button id="addBtn" class="btn btn-primary btn-block">+ เพิ่มนักเรียน</button>
-        <div id="adminMsg" class="msg"></div>
-        <div id="studentList" class="student-list"></div>
-      </div>
-    </section>
-  </main>
 
-  <!-- ============ MODAL ============ -->
-  <div id="modal" class="modal hidden" aria-hidden="true">
-    <div class="modal-backdrop" data-close></div>
-    <div class="modal-content card" role="dialog" aria-modal="true">
-      <div class="modal-head">
-        <h3 id="modalTitle">เพิ่มนักเรียน</h3>
-        <button id="modalClose" class="icon-btn" aria-label="ปิด" data-close>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <!-- จำนวนวิชา -->
+        <div class="sc-count" id="subCount"></div>
+
+        <!-- รายการคะแนน -->
+        <div class="score-list" id="scoreList"></div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════ ADMIN ══════ -->
+  <section id="view-admin" class="view">
+
+    <div id="adminLogin" class="glass card login-card">
+      <div class="lc-icon" style="width:62px;height:62px;border-radius:18px;margin-bottom:16px">
+        <svg class="ico" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <h2>เข้าสู่ระบบ Admin</h2>
+      <p class="muted" style="margin-top:5px">กรุณาใส่รหัสผ่านเพื่อจัดการข้อมูลนักเรียน</p>
+      <form id="loginForm" class="login-form">
+        <div class="input-wrap">
+          <svg class="ico input-icon" viewBox="0 0 24 24"><rect width="18" height="11" x="3" y="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <input type="password" id="adminPassword" placeholder="รหัสผ่าน" required/>
+        </div>
+        <button type="submit" class="btn btn-primary">เข้าสู่ระบบ</button>
+      </form>
+      <div id="loginMsg" class="msg"></div>
+      <p class="hint-sm">รหัสผ่านเริ่มต้น: <code>admin123</code></p>
+    </div>
+
+    <div id="adminPanel" class="hidden">
+      <div class="admin-top">
+        <div>
+          <h2>จัดการข้อมูลนักเรียน</h2>
+          <span class="count-pill" id="adminCount">ทั้งหมด 0 คน</span>
+        </div>
+        <button id="logoutBtn" class="btn btn-glass btn-sm">
+          <svg class="ico" viewBox="0 0 24 24" style="width:15px;height:15px"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          ออกจากระบบ
         </button>
       </div>
-      <form id="studentForm" class="student-form">
-        <input type="hidden" id="formId" />
-        <div class="field">
-          <label for="formIdStd">รหัสนักเรียน (ID STD) <em>*</em></label>
-          <input type="text" id="formIdStd" placeholder="เช่น 66010001" required />
-        </div>
-        <div class="field">
-          <label for="formName">ชื่อ-สกุล</label>
-          <input type="text" id="formName" placeholder="เช่น สมชาย ใจดี" />
-        </div>
-        <div class="field">
-          <label>รูปภาพ</label>
-          <label class="dropzone" id="dropzone">
-            <input type="file" id="formPicture" accept="image/*" />
-            <img id="formPicturePreview" src="" alt="" class="pic-preview hidden" />
-            <div class="dropzone-empty" id="dropzoneEmpty">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
-              <span>เลือกรูปภาพนักเรียน</span>
-            </div>
-          </label>
-          <button type="button" id="clearPictureBtn" class="btn btn-ghost btn-sm hidden">ลบรูป</button>
-        </div>
-
-        <div class="subjects-block">
-          <div class="subjects-head">
-            <span>รายวิชาและคะแนน</span>
-            <button type="button" id="addSubjectBtn" class="btn btn-ghost btn-sm">+ เพิ่มวิชา</button>
-          </div>
-          <div id="subjectRows"></div>
-        </div>
-
-        <div id="formMsg" class="msg"></div>
-        <div class="form-actions">
-          <button type="button" id="cancelBtn" class="btn btn-ghost" data-close>ยกเลิก</button>
-          <button type="submit" class="btn btn-primary">บันทึก</button>
-        </div>
-      </form>
+      <button id="addBtn" class="btn btn-primary btn-block" style="margin-bottom:4px">
+        <svg class="ico" viewBox="0 0 24 24" style="width:17px;height:17px"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        เพิ่มนักเรียน
+      </button>
+      <div id="adminMsg" class="msg"></div>
+      <div id="studentList" class="student-list"></div>
     </div>
-  </div>
 
-  <script src="/js/app.js"></script>
+  </section>
+</main>
+
+<!-- ══════ MODAL ══════ -->
+<div id="modal" class="modal hidden" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-box" role="dialog" aria-modal="true">
+    <div class="modal-head">
+      <h3 id="modalTitle">เพิ่มนักเรียน</h3>
+      <button id="modalClose" class="icon-btn" aria-label="ปิด" data-close>
+        <svg class="ico" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <form id="studentForm" class="sform">
+      <input type="hidden" id="formId"/>
+      <div class="field">
+        <label for="formIdStd">รหัสนักเรียน (ID STD) <em>*</em></label>
+        <input type="text" id="formIdStd" placeholder="เช่น 66010001" required/>
+      </div>
+      <div class="field">
+        <label for="formName">ชื่อ-สกุล</label>
+        <input type="text" id="formName" placeholder="เช่น สมชาย ใจดี"/>
+      </div>
+      <div class="field">
+        <label>รูปภาพ</label>
+        <label class="dropzone" id="dropzone">
+          <input type="file" id="formPicture" accept="image/*"/>
+          <img id="formPicturePreview" src="" alt="" class="pic-preview hidden"/>
+          <div class="dz-label" id="dropzoneEmpty">
+            <svg class="ico" viewBox="0 0 24 24"><rect width="18" height="18" x="3" y="3" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>
+            <span>เลือกรูปภาพนักเรียน</span>
+          </div>
+        </label>
+        <button type="button" id="clearPictureBtn" class="btn btn-glass btn-sm hidden">ลบรูป</button>
+      </div>
+      <div class="subs-block">
+        <div class="subs-head">
+          <span>รายวิชาและคะแนน</span>
+          <button type="button" id="addSubjectBtn" class="btn btn-glass btn-sm">+ เพิ่มวิชา</button>
+        </div>
+        <div id="subjectRows"></div>
+      </div>
+      <div id="formMsg" class="msg"></div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-glass" data-close>ยกเลิก</button>
+        <button type="submit" class="btn btn-primary">บันทึก</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+/* ── state ── */
+const state = {
+  token: localStorage.getItem('admin_token') || '',
+  editingId: null,
+  pendingPic: null,
+  keepPic: false
+};
+
+/* ── api ── */
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (state.token) headers['Authorization'] = 'Bearer ' + state.token;
+  const res = await fetch(path, { ...opts, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+  return data;
+}
+
+/* ── helpers ── */
+const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
+function setMsg(el,t,ty){if(!el)return;el.textContent=t||'';el.className='msg'+(ty?' '+ty:'');}
+function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function setAv(c,pic,fb){
+  if(pic){c.innerHTML=`<img src="${esc(pic)}" alt="">`;}
+  else{const i=(fb||'?').trim().charAt(0).toUpperCase();c.innerHTML=`<div class="avatar-fallback">${esc(i)}</div>`;}
+}
+function setLoad(b,ld,tx){
+  if(ld){b.dataset.lbl=tx;b.innerHTML='<span class="spinner"></span>';b.disabled=true;}
+  else{b.innerHTML=b.dataset.lbl||tx;b.disabled=false;}
+}
+
+/* ── tabs ── */
+$$('.tab').forEach(t=>t.addEventListener('click',()=>{
+  const target='view-'+t.dataset.view;
+  $$('.tab').forEach(x=>x.classList.toggle('active',x===t));
+  $$('.view').forEach(v=>{
+    if(v.id===target){
+      v.style.animation='none';
+      v.classList.add('active');
+      requestAnimationFrame(()=>requestAnimationFrame(()=>{ v.style.animation=''; }));
+    } else {
+      v.classList.remove('active');
+    }
+  });
+}));
+
+/* ── quick-try tags ── */
+$$('.tag').forEach(tg=>tg.addEventListener('click',()=>{
+  $('#lookupId').value=tg.dataset.id;
+  $('#lookupForm').dispatchEvent(new Event('submit',{cancelable:true}));
+}));
+
+/* ── lookup ── */
+$('#lookupForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const id=$('#lookupId').value.trim();if(!id)return;
+  setMsg($('#lookupMsg'),'','');
+  $('#resultBox').classList.add('hidden');
+  setLoad($('#lookupBtn'),true,'ตรวจสอบ');
+  try{const s=await api(`/api/student/${encodeURIComponent(id)}`);renderResult(s);}
+  catch(err){setMsg($('#lookupMsg'),err.message,'error');}
+  finally{setLoad($('#lookupBtn'),false,'ตรวจสอบ');}
+});
+
+function renderResult(s){
+  setAv($('#studentAvatar'),s.picture,s.name||s.id_std);
+  $('#studentName').textContent=s.name||'(ไม่ระบุชื่อ)';
+  $('#studentId').textContent='รหัส '+s.id_std;
+  const subs=s.subjects||[];
+  $('#subCount').textContent=subs.length+' วิชา';
+  const list=$('#scoreList');list.innerHTML='';
+  if(!subs.length){
+    list.innerHTML='<div class="score-empty">ยังไม่มีข้อมูลคะแนน</div>';
+  }else{
+    subs.forEach((sub,i)=>{
+      const row=document.createElement('div');row.className='score-row';
+      const n=document.createElement('span');n.className='sr-name';n.textContent=sub.name;
+      const sc=document.createElement('span');sc.className='sr-score';sc.textContent=sub.score;
+      row.appendChild(n);row.appendChild(sc);
+      list.appendChild(row);
+      setTimeout(()=>row.classList.add('visible'),60+i*70);
+    });
+  }
+  $('#resultBox').classList.remove('hidden');
+}
+
+
+/* ── login ── */
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();setMsg($('#loginMsg'),'','');
+  try{
+    const{token}=await api('/api/login',{method:'POST',body:JSON.stringify({password:$('#adminPassword').value})});
+    state.token=token;localStorage.setItem('admin_token',token);
+    $('#adminPassword').value='';showPanel();
+  }catch(err){setMsg($('#loginMsg'),err.message,'error');}
+});
+
+$('#logoutBtn').addEventListener('click',()=>{
+  state.token='';localStorage.removeItem('admin_token');
+  $('#adminLogin').classList.remove('hidden');
+  $('#adminPanel').classList.add('hidden');
+});
+
+function showPanel(){
+  $('#adminLogin').classList.add('hidden');
+  $('#adminPanel').classList.remove('hidden');
+  loadStudents();
+}
+
+/* ── student list ── */
+async function loadStudents(){
+  setMsg($('#adminMsg'),'กำลังโหลด...','');
+  try{
+    const st=await api('/api/admin/students');
+    setMsg($('#adminMsg'),'','');
+    $('#adminCount').textContent='ทั้งหมด '+st.length+' คน';
+    renderList(st);
+  }catch(err){setMsg($('#adminMsg'),err.message,'error');}
+}
+function renderList(st){
+  const list=$('#studentList');list.innerHTML='';
+  if(!st.length){list.innerHTML='<div class="list-empty">ยังไม่มีนักเรียนในระบบ</div>';return;}
+  st.forEach(s=>{
+    const nsubs=(s.subjects||[]).length;
+    const names=(s.subjects||[]).map(x=>x.name).join(', ')||'ยังไม่มีวิชา';
+    const div=document.createElement('div');div.className='student-item';
+    div.innerHTML=
+      '<div class="si-av" id="sav-'+s.id+'"></div>'+
+      '<div class="si-info">'+
+        '<div class="si-id">'+esc(s.id_std)+'</div>'+
+        '<div class="si-name">'+esc(s.name||'(ไม่ระบุชื่อ)')+'</div>'+
+        '<div class="si-subs">'+esc(names)+' · '+nsubs+' วิชา</div>'+
+      '</div>'+
+      '<div class="si-actions">'+
+        '<button class="btn btn-glass btn-sm" data-edit="'+s.id+'">แก้ไข</button>'+
+        '<button class="btn btn-danger btn-sm" data-del="'+s.id+'">ลบ</button>'+
+      '</div>';
+    list.appendChild(div);
+    setAv(div.querySelector('#sav-'+s.id),s.picture,s.name||s.id_std);
+  });
+  list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openForm(Number(b.dataset.edit))));
+  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delStudent(Number(b.dataset.del))));
+}
+
+/* ── modal ── */
+const modalEl=$('#modal');
+function openModal(){
+  modalEl.classList.remove('hidden');
+  requestAnimationFrame(()=>modalEl.classList.add('open'));
+}
+function closeModal(){
+  modalEl.classList.remove('open');
+  setTimeout(()=>modalEl.classList.add('hidden'),400);
+  state.editingId=null;state.pendingPic=null;state.keepPic=false;
+}
+
+$('#addBtn').addEventListener('click',()=>openForm(null));
+document.addEventListener('click',e=>{if(e.target.closest('[data-close]'))closeModal();});
+$('#addSubjectBtn').addEventListener('click',()=>addSubRow());
+
+$('#clearPictureBtn').addEventListener('click',()=>{
+  state.pendingPic=null;state.keepPic=false;
+  $('#formPicture').value='';
+  $('#formPicturePreview').classList.add('hidden');
+  $('#formPicturePreview').src='';
+  $('#dropzoneEmpty').classList.remove('hidden');
+  $('#clearPictureBtn').classList.add('hidden');
+});
+
+$('#formPicture').addEventListener('change',e=>{
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    state.pendingPic=r.result;
+    $('#formPicturePreview').src=r.result;
+    $('#formPicturePreview').classList.remove('hidden');
+    $('#dropzoneEmpty').classList.add('hidden');
+    state.keepPic=false;
+    $('#clearPictureBtn').classList.remove('hidden');
+  };
+  r.readAsDataURL(f);
+});
+
+$('#studentForm').addEventListener('submit',async e=>{
+  e.preventDefault();setMsg($('#formMsg'),'กำลังบันทึก...','');
+  const body={id_std:$('#formIdStd').value.trim(),name:$('#formName').value.trim(),subjects:collectSubs()};
+  if(state.pendingPic)body.picture=state.pendingPic;
+  if(state.editingId!==null&&!state.pendingPic&&!state.keepPic)body.clearPicture=true;
+  try{
+    if(state.editingId===null)await api('/api/admin/students',{method:'POST',body:JSON.stringify(body)});
+    else await api('/api/admin/students/'+state.editingId,{method:'PUT',body:JSON.stringify(body)});
+    closeModal();loadStudents();
+  }catch(err){setMsg($('#formMsg'),err.message,'error');}
+});
+
+function openForm(id){
+  state.editingId=id;state.pendingPic=null;state.keepPic=false;
+  setMsg($('#formMsg'),'','');
+  $('#studentForm').reset();
+  $('#formPicturePreview').classList.add('hidden');$('#formPicturePreview').src='';
+  $('#dropzoneEmpty').classList.remove('hidden');$('#clearPictureBtn').classList.add('hidden');
+  $('#subjectRows').innerHTML='';
+  if(id===null){
+    $('#modalTitle').textContent='เพิ่มนักเรียน';$('#formId').value='';
+    addSubRow();
+    openModal();
+  }else{
+    $('#modalTitle').textContent='แก้ไขนักเรียน';
+    api('/api/admin/students').then(st=>{
+      const s=st.find(x=>x.id===id);if(!s)return closeModal();
+      $('#formId').value=s.id_std;$('#formIdStd').value=s.id_std;$('#formName').value=s.name||'';
+      if(s.picture){
+        state.keepPic=true;
+        $('#formPicturePreview').src=s.picture;
+        $('#formPicturePreview').classList.remove('hidden');
+        $('#dropzoneEmpty').classList.add('hidden');
+        $('#clearPictureBtn').classList.remove('hidden');
+      }
+      (s.subjects||[]).forEach(sub=>addSubRow(sub.name,sub.score));
+      if(!(s.subjects||[]).length)addSubRow();
+      openModal();
+    }).catch(err=>setMsg($('#formMsg'),err.message,'error'));
+  }
+}
+
+function addSubRow(name='',score=''){
+  const row=document.createElement('div');row.className='sub-row';
+  const ni=document.createElement('input');ni.type='text';ni.className='name';ni.placeholder='ชื่อวิชา';ni.value=name;
+
+  /* score wrap with ± buttons */
+  const wrap=document.createElement('div');wrap.className='score-wrap';
+  const minus=document.createElement('button');minus.type='button';minus.className='score-step';minus.setAttribute('aria-label','ลด');minus.textContent='−';
+  const si=document.createElement('input');si.type='number';si.className='score';si.placeholder='0';si.min='0';si.max='100';si.step='1';si.value=score===''?'':score;
+  const plus=document.createElement('button');plus.type='button';plus.className='score-step';plus.setAttribute('aria-label','เพิ่ม');plus.textContent='+';
+  minus.addEventListener('click',()=>{const v=parseFloat(si.value)||0;si.value=Math.max(0,v-1);});
+  plus.addEventListener('click',()=>{const v=parseFloat(si.value)||0;si.value=Math.min(100,v+1);});
+  wrap.appendChild(minus);wrap.appendChild(si);wrap.appendChild(plus);
+
+  const rb=document.createElement('button');rb.type='button';rb.className='rm-btn';rb.setAttribute('aria-label','ลบ');rb.textContent='✕';
+  rb.addEventListener('click',()=>row.remove());
+  row.appendChild(ni);row.appendChild(wrap);row.appendChild(rb);
+  $('#subjectRows').appendChild(row);
+}
+
+function collectSubs(){
+  const out=[];
+  $$('#subjectRows .sub-row').forEach(r=>{
+    const n=r.querySelector('.name').value.trim();
+    const sc=r.querySelector('.score').value;
+    if(n)out.push({name:n,score:sc===''?0:Number(sc)});
+  });
+  return out;
+}
+
+async function delStudent(id){
+  if(!confirm('ต้องการลบนักเรียนคนนี้ใช่หรือไม่?'))return;
+  try{await api('/api/admin/students/'+id,{method:'DELETE'});loadStudents();}
+  catch(err){setMsg($('#adminMsg'),err.message,'error');}
+}
+
+/* ── init ── */
+if(state.token)showPanel();
+</script>
 </body>
 </html>
