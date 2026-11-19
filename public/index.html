@@ -711,6 +711,7 @@ async function loadStudents(){
   }catch(err){setMsg($('#adminMsg'),err.message,'error');}
 }
 function renderList(st){
+  state.students = st;
   const list=$('#studentList');list.innerHTML='';
   if(!st.length){list.innerHTML='<div class="list-empty">ยังไม่มีนักเรียนในระบบ</div>';return;}
   st.forEach(s=>{
@@ -731,8 +732,8 @@ function renderList(st){
     list.appendChild(div);
     setAv(div.querySelector('#sav-'+s.id),s.picture,s.name||s.id_std);
   });
-  list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openForm(Number(b.dataset.edit))));
-  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delStudent(Number(b.dataset.del))));
+  list.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click',()=>openForm(b.dataset.edit)));
+  list.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click',()=>delStudent(b.dataset.del)));
 }
 
 /* ── modal ── */
@@ -799,21 +800,32 @@ function openForm(id){
     openModal();
   }else{
     $('#modalTitle').textContent='แก้ไขนักเรียน';
-    api('/api/admin/students').then(st=>{
-      const s=st.find(x=>x.id===id);if(!s)return closeModal();
-      $('#formId').value=s.id_std;$('#formIdStd').value=s.id_std;$('#formName').value=s.name||'';
-      if(s.picture){
-        state.keepPic=true;
-        $('#formPicturePreview').src=s.picture;
-        $('#formPicturePreview').classList.remove('hidden');
-        $('#dropzoneEmpty').classList.add('hidden');
-        $('#clearPictureBtn').classList.remove('hidden');
-      }
-      (s.subjects||[]).forEach(sub=>addSubRow(sub.name,sub.score));
-      if(!(s.subjects||[]).length)addSubRow();
-      openModal();
-    }).catch(err=>setMsg($('#formMsg'),err.message,'error'));
+    const s = (state.students||[]).find(x => String(x.id) === String(id));
+    if (s) {
+      populateStudentForm(s);
+    } else {
+      api('/api/admin/students').then(st=>{
+        state.students = st;
+        const found = (st||[]).find(x => String(x.id) === String(id));
+        if(!found) return;
+        populateStudentForm(found);
+      }).catch(err=>setMsg($('#adminMsg'),err.message,'error'));
+    }
   }
+}
+
+function populateStudentForm(s){
+  $('#formId').value=s.id;$('#formIdStd').value=s.id_std;$('#formName').value=s.name||'';
+  if(s.picture){
+    state.keepPic=true;
+    $('#formPicturePreview').src=s.picture;
+    $('#formPicturePreview').classList.remove('hidden');
+    $('#dropzoneEmpty').classList.add('hidden');
+    $('#clearPictureBtn').classList.remove('hidden');
+  }
+  (s.subjects||[]).forEach(sub=>addSubRow(sub.name,sub.score));
+  if(!(s.subjects||[]).length)addSubRow();
+  openModal();
 }
 
 function addSubRow(name='',score=''){

@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 import pg from 'pg';
 
 const { Pool } = pg;
+pg.types.setTypeParser(20, (val) => parseInt(val, 10));
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PORT           = process.env.PORT           || 3000;
@@ -134,7 +135,7 @@ async function getStudentWithSubjects(client, id) {
 async function publicStudent(client, row) {
   const subjects = await getStudentWithSubjects(client, row.id);
   return {
-    id:       row.id,
+    id:       parseInt(row.id, 10),
     id_std:   row.id_std,
     name:     row.name,
     picture:  row.picture ? `/uploads/${row.picture}` : null,
@@ -299,7 +300,8 @@ app.put('/api/admin/students/:id', auth, async (req, res) => {
     res.json(await publicStudent(client, updated.rows[0]));
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
-    res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+    if (e.code === '23505') return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
+    res.status(500).json({ error: e.message || 'บันทึกไม่สำเร็จ' });
   } finally {
     client.release();
   }
