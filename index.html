@@ -82,25 +82,25 @@ body{
   backdrop-filter:var(--blur);-webkit-backdrop-filter:var(--blur);
   border:1px solid var(--border);box-shadow:var(--sh);
 }
-.brand{display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
 .brand-mark{
   width:36px;height:36px;border-radius:12px;display:grid;place-items:center;
   background:linear-gradient(135deg,#8b5cf6,#ec4899);
-  box-shadow:0 4px 16px rgba(168,85,247,0.55);
+  box-shadow:0 4px 16px rgba(168,85,247,0.55);flex-shrink:0;
 }
 .brand-mark .ico{width:19px;height:19px;stroke:#fff}
-.brand-text{font-size:1rem;font-weight:700}
+.brand-text{font-size:1rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .tabs{
   display:flex;gap:2px;
   background:rgba(255,255,255,0.10);
   padding:3px;border-radius:var(--pill);
-  border:1px solid var(--border2);
+  border:1px solid var(--border2);flex-shrink:0;
 }
 .tab{
   background:transparent;border:none;color:var(--muted);
   font-family:var(--f);font-size:0.9rem;font-weight:600;
   padding:7px 18px;border-radius:var(--pill);cursor:pointer;
-  transition:all .2s ease;
+  transition:all .2s ease;white-space:nowrap;
 }
 .tab.active{
   background:#fff;color:#5b21b6;
@@ -419,11 +419,44 @@ body{
 .form-actions .btn{min-width:110px}
 
 /* ── responsive ── */
-@media(max-width:460px){
+@media(max-width:480px){
+  .topbar{top:8px;margin:8px auto 0;padding:0 8px}
+  .nav{padding:6px 10px;gap:8px}
+  .brand-mark{width:32px;height:32px;border-radius:10px}
+  .brand-mark .ico{width:17px;height:17px}
+  .brand-text{font-size:0.86rem}
+  .tabs{padding:2px;gap:2px}
+  .tab{padding:6px 12px;font-size:0.82rem}
+
+  #app{padding:14px 8px 60px}
+  .card{padding:18px 14px;border-radius:18px}
+  .lookup-card h1{font-size:1.35rem}
   .lookup-form,.login-form{flex-direction:column}
+  .lookup-form .btn,.login-form .btn{width:100%}
+
+  .student-card{padding:16px 14px}
+  .student-item{flex-direction:column;align-items:flex-start;gap:10px}
+  .si-actions{width:100%;justify-content:flex-end;gap:6px}
+  .si-actions .btn{flex:1;padding:8px 10px}
+
+  .modal{padding:10px}
+  .modal-box{padding:16px 12px;border-radius:18px;max-height:94vh}
+  .sub-row{gap:5px}
+  .sub-row input{padding:8px 8px;font-size:0.86rem}
+  .score-wrap{width:96px}
+  .score-step{width:26px;height:36px}
+  .rm-btn{width:32px;height:36px}
   .form-actions .btn{flex:1}
-  .student-item{flex-wrap:wrap}
-  .si-actions{width:100%;justify-content:flex-end}
+}
+
+@media(max-width:360px){
+  .topbar{padding:0 4px}
+  .nav{padding:5px 6px;gap:4px}
+  .brand{gap:6px}
+  .brand-mark{width:28px;height:28px;border-radius:8px}
+  .brand-mark .ico{width:15px;height:15px}
+  .brand-text{font-size:0.78rem}
+  .tab{padding:5px 8px;font-size:0.76rem}
 }
 </style>
 </head>
