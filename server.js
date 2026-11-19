@@ -138,7 +138,7 @@ async function publicStudent(client, row) {
     id:       parseInt(row.id, 10),
     id_std:   row.id_std,
     name:     row.name,
-    picture:  row.picture ? `/uploads/${row.picture}` : null,
+    picture:  row.picture ? (row.picture.startsWith('data:') || row.picture.startsWith('http') ? row.picture : `/uploads/${row.picture}`) : null,
     subjects,
   };
 }
@@ -227,9 +227,10 @@ app.post('/api/admin/students', auth, async (req, res) => {
   if (!id_std || !String(id_std).trim())
     return res.status(400).json({ error: 'กรุณาระบุรหัสนักเรียน (ID STD)' });
 
-  let pictureFile = null;
-  if (picture && String(picture).startsWith('data:image'))
-    pictureFile = savePicture(picture, id_std);
+  let pictureData = null;
+  if (picture && (String(picture).startsWith('data:image') || String(picture).startsWith('http'))) {
+    pictureData = picture;
+  }
 
   const cleanSubs = (Array.isArray(subjects) ? subjects : []).map(cleanSubject).filter(Boolean);
   const client = await pool.connect();
@@ -237,7 +238,7 @@ app.post('/api/admin/students', auth, async (req, res) => {
     await client.query('BEGIN');
     const { rows } = await client.query(
       'INSERT INTO students (id_std, name, picture) VALUES ($1, $2, $3) RETURNING *',
-      [id_std, name || '', pictureFile]
+      [id_std, name || '', pictureData]
     );
     const sid = rows[0].id;
     for (const s of cleanSubs) {
@@ -250,9 +251,8 @@ app.post('/api/admin/students', auth, async (req, res) => {
     res.status(201).json(await publicStudent(client, rows[0]));
   } catch (e) {
     await client.query('ROLLBACK');
-    deletePicture(pictureFile);
     if (e.code === '23505') return res.status(409).json({ error: 'รหัสนักเรียนซ้ำในระบบ' });
-    res.status(500).json({ error: 'บันทึกไม่สำเร็จ' });
+    res.status(500).json({ error: e.message || 'บันทึกไม่สำเร็จ' });
   } finally {
     client.release();
   }
@@ -276,10 +276,10 @@ app.put('/api/admin/students/:id', auth, async (req, res) => {
     }
 
     let newPic = row.picture;
-    if (clearPicture) { deletePicture(row.picture); newPic = null; }
-    else if (picture && String(picture).startsWith('data:image')) {
-      deletePicture(row.picture);
-      newPic = savePicture(picture, id_std || row.id_std);
+    if (clearPicture) {
+      newPic = null;
+    } else if (picture && (String(picture).startsWith('data:image') || String(picture).startsWith('http'))) {
+      newPic = picture;
     }
 
     await client.query('BEGIN');

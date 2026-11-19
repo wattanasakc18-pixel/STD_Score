@@ -647,8 +647,12 @@ const $=s=>document.querySelector(s);const $$=s=>document.querySelectorAll(s);
 function setMsg(el,t,ty){if(!el)return;el.textContent=t||'';el.className='msg'+(ty?' '+ty:'');}
 function esc(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function setAv(c,pic,fb){
-  if(pic){c.innerHTML=`<img src="${esc(pic)}" alt="">`;}
-  else{const i=(fb||'?').trim().charAt(0).toUpperCase();c.innerHTML=`<div class="avatar-fallback">${esc(i)}</div>`;}
+  const initial=(fb||'?').trim().charAt(0).toUpperCase()||'?';
+  if(pic){
+    c.innerHTML=`<img src="${esc(pic)}" alt="" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=\\'avatar-fallback\\'>${esc(initial)}</div>';">`;
+  }else{
+    c.innerHTML=`<div class="avatar-fallback">${esc(initial)}</div>`;
+  }
 }
 function setLoad(b,ld,tx){
   if(ld){b.dataset.lbl=tx;b.innerHTML='<span class="spinner"></span>';b.disabled=true;}
@@ -798,12 +802,25 @@ $('#formPicture').addEventListener('change',e=>{
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=()=>{
-    state.pendingPic=r.result;
-    $('#formPicturePreview').src=r.result;
-    $('#formPicturePreview').classList.remove('hidden');
-    $('#dropzoneEmpty').classList.add('hidden');
-    state.keepPic=false;
-    $('#clearPictureBtn').classList.remove('hidden');
+    const img=new Image();
+    img.onload=()=>{
+      const maxDim=360;
+      let w=img.width,h=img.height;
+      if(w>maxDim||h>maxDim){
+        if(w>h){h=Math.round((h*maxDim)/w);w=maxDim;}
+        else{w=Math.round((w*maxDim)/h);h=maxDim;}
+      }
+      const cv=document.createElement('canvas');cv.width=w;cv.height=h;
+      cv.getContext('2d').drawImage(img,0,0,w,h);
+      const dataUrl=cv.toDataURL('image/jpeg',0.82);
+      state.pendingPic=dataUrl;
+      $('#formPicturePreview').src=dataUrl;
+      $('#formPicturePreview').classList.remove('hidden');
+      $('#dropzoneEmpty').classList.add('hidden');
+      state.keepPic=false;
+      $('#clearPictureBtn').classList.remove('hidden');
+    };
+    img.src=r.result;
   };
   r.readAsDataURL(f);
 });
